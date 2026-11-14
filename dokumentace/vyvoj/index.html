@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Architektura backendu – Vývojářská dokumentace Menza UTB</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="../style.css?v=4">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+</head>
+<body>
+<div id="wrap">
+    <div id="header"><header>
+        <div class="logo-area">
+            <div class="logo-icon"><span class="material-symbols-outlined">restaurant</span></div>
+            <div class="logo-text">
+                <h1>Menza UTB – Uživatelská nápověda</h1>
+                <p>Dokumentace a technické manuály k systému vizuální prezentace jídel</p>
+            </div>
+        </div>
+    </header></div>
+    <div id="xmain">
+        <div id="menu">
+            <button id="menu-toggle" onclick="document.getElementById('menu').classList.toggle('open')"><span class="material-symbols-outlined">menu</span> Navigace</button>
+            <ul>
+                <li><a href="../uzivatel/index.html"><span class="material-symbols-outlined icon">menu_book</span>1. Uživatelský manuál</a></li>
+                <li><a href="../spravce/index.html"><span class="material-symbols-outlined icon">admin_panel_settings</span>2. Správcovská příručka</a></li>
+                <li id="current"><a href="../vyvoj/index.html" class="active"><span class="material-symbols-outlined icon">code</span>3. Vývojářská dokumentace</a>
+                    <ul class="sideSub">
+                        <li><a href="../vyvoj/index.html" class="active">Architektura backendu (Flask &amp; DB)</a></li>
+                        <li><a href="../vyvoj/mobil.html">Mobilní vnitřnosti (Isolates &amp; Cache)</a></li>
+                </li>
+            </ul>
+        </div>
+        <div id="content-wrap"><div id="main">
+
+            <h3 class="title">Architektura backendu (Flask &amp; Databáze)</h3>
+
+            <p>Architekturu serveru (backendu) jsme navrhli s ohledem na vysoký výkon, bezpečnost, odolnost proti výpadkům sítě a co nejnižší režii při komunikaci s databází a externími zdroji dat. Celou aplikaci pohání Python s mikroframeworkem Flask, spuštěný pod WSGI serverem Gunicorn.</p>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Adresářová struktura projektu</h4>
+
+            <pre><code>webova_aplikace/
+├── app.py                  # Hlavní Flask aplikace a definice API endpointů
+├── menu_cache.py           # Asynchronní mezipaměť jídelníčků (daemon vlákno)
+├── menu_collector.py       # Klient pro stahování dat z API WebKreditu
+├── robot.py                # Synchronizační skript pro plnění databáze
+├── utils.py                # Sdílené utility (DB pool, parser alergenů, slug)
+├── gunicorn.conf.py        # Konfigurace WSGI serveru Gunicorn
+├── requirements.txt        # Závislosti Python balíčků
+├── Dockerfile              # Předpis pro sestavení Docker obrazu
+├── init_db.sql             # Schéma a výchozí seznam jídel pro PostgreSQL
+├── templates/
+│   ├── index.html          # TV signage – hlavní prezentační rozhraní
+│   └── test.html           # Diagnostická stránka (dbcheck)
+└── static/
+    ├── uploads/            # Nahrané fotografie pokrmů (persistentní volume)
+    └── photos/             # Statické zástupné obrázky</code></pre>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Správa databázových připojení (Connection Pooling)</h4>
+
+            <p>Abychom ušetřili systémové prostředky a vyhnuli se neustálému otevírání a zavírání TCP spojení k databázi při každém požadavku, implementovali jsme pool připojení. Využíváme k tomu třídu <code>ThreadedConnectionPool</code> z knihovny <code>psycopg2</code>:</p>
+
+            <pre><code># Inicializace ThreadedConnectionPool v utils.py (min 2, max 10 připojení)
+_db_pool = pool.ThreadedConnectionPool(
+    2, 10,
+    host=DB_HOST, port=DB_PORT,
+    database=DB_NAME, user=DB_USER, password=DB_PASS
+)</code></pre>
+
+            <p>Vlákna serveru a asynchronní workery si připojení půjčují metodou <code>get_conn()</code> a po dokončení práce ho v bloku <code>finally</code> bezpečně vracejí zpět přes <code>release_conn()</code>. Pokud transakce selže, zavolá se <code>conn.rollback()</code>, což zajistí integritu a konzistenci dat.</p>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Asynchronní paměťová mezipaměť (menu_cache.py)</h4>
+
+            <p>Chceme-li šetřit oficiální API WebKreditu a zaručit, že infopanely budou fungovat i při výpadku internetu, vytvořili jsme paměťovou mezipaměť (cache) v modulu <code>menu_cache.py</code>. Při startu Flasku se spustí samostatné daemon vlákno:</p>
+
+            <pre><code># Spuštění cache workeru jako daemon vlákna
+t = threading.Thread(target=_worker, args=(app,), daemon=True, name="menu-cache-worker")
+t.start()</code></pre>
+
+            <p>Toto asynchronní vlákno na pozadí každých 30 sekund stahuje aktuální data ze všech sledovaných menz a ukládá je do paměťového slovníku <code>_cache</code>. Protože k mezipaměti přistupuje více vláken naráz (z infopanelů i z telefonů obsluhy), je přístup chráněn zámkem <code>threading.Lock()</code>, abychom předešli stavům souběhu (race conditions).</p>
+
+            <p>Pokud je mezipaměť po startu serveru prázdná, aplikace provede přímý dotaz na API WebKreditu (fallback), takže data jsou dostupná okamžitě bez čekání na první doběhnutí workeru.</p>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Databázové schéma</h4>
+
+            <p>Relační databáze PostgreSQL obsahuje tři hlavní tabulky propojené cizími klíči:</p>
+
+            <table class="data-table">
+                <tr>
+                    <th>Tabulka</th>
+                    <th>Sloupec</th>
+                    <th>Typ</th>
+                    <th>Popis</th>
+                </tr>
+                <tr>
+                    <td rowspan="2"><code>categories</code></td>
+                    <td><code>id</code></td>
+                    <td>SERIAL PK</td>
+                    <td>Primární klíč kategorie</td>
+                </tr>
+                <tr>
+                    <td><code>name</code></td>
+                    <td>VARCHAR(100)</td>
+                    <td>Název kategorie (Oběd, Minutka, Polévka…)</td>
+                </tr>
+                <tr>
+                    <td rowspan="5"><code>meals</code></td>
+                    <td><code>id</code></td>
+                    <td>SERIAL PK</td>
+                    <td>Primární klíč pokrmu</td>
+                </tr>
+                <tr>
+                    <td><code>category_id</code></td>
+                    <td>FK → categories</td>
+                    <td>Odkaz na kategorii</td>
+                </tr>
+                <tr>
+                    <td><code>original_name</code></td>
+                    <td>TEXT</td>
+                    <td>Originální český název</td>
+                </tr>
+                <tr>
+                    <td><code>name_en</code></td>
+                    <td>TEXT</td>
+                    <td>Anglický překlad názvu</td>
+                </tr>
+                <tr>
+                    <td><code>slug</code></td>
+                    <td>VARCHAR</td>
+                    <td>Unikátní ASCII identifikátor (bez diakritiky)</td>
+                </tr>
+                <tr>
+                    <td rowspan="4"><code>photos</code></td>
+                    <td><code>id</code></td>
+                    <td>SERIAL PK</td>
+                    <td>Primární klíč fotografie</td>
+                </tr>
+                <tr>
+                    <td><code>meal_id</code></td>
+                    <td>FK → meals</td>
+                    <td>Odkaz na pokrm</td>
+                </tr>
+                <tr>
+                    <td><code>file_path</code></td>
+                    <td>TEXT</td>
+                    <td>Relativní cesta k souboru (<code>uploads/img_meal_*.jpg</code>)</td>
+                </tr>
+                <tr>
+                    <td><code>is_primary</code></td>
+                    <td>BOOLEAN</td>
+                    <td>Indikátor primární fotografie (zobrazená na TV)</td>
+                </tr>
+            </table>
+
+            <p>Při nahrání nové fotky ke stejnému jídlu se u všech starších snímků automaticky vypne příznak <code>is_primary</code> a nová fotka se označí jako hlavní. Na televizních panelech pak zobrazujeme vždy pouze tuto nejnovější primární fotografii.</p>
+
+            <!-- ================================================================ -->
+            <h4 class="title">REST API – přehled endpointů</h4>
+
+            <table class="data-table">
+                <tr>
+                    <th>Metoda</th>
+                    <th>Endpoint</th>
+                    <th>Popis</th>
+                </tr>
+                <tr>
+                    <td><code>GET</code></td>
+                    <td><code>/</code></td>
+                    <td>Hlavní stránka TV signage (Jinja2 šablona <code>index.html</code>)</td>
+                </tr>
+                <tr>
+                    <td><code>GET</code></td>
+                    <td><code>/test</code></td>
+                    <td>Diagnostická stránka pro ověření stavu DB a API</td>
+                </tr>
+                <tr>
+                    <td><code>GET</code></td>
+                    <td><code>/api/load-menu?canteen_id=X</code></td>
+                    <td>Jídelníček pro TV panel – vrací pokrmy s fotkami a cenami</td>
+                </tr>
+                <tr>
+                    <td><code>GET</code></td>
+                    <td><code>/api/portions?canteen_id=X</code></td>
+                    <td>Aktuální počty zbývajících porcí pro danou menzu</td>
+                </tr>
+                <tr>
+                    <td><code>GET</code></td>
+                    <td><code>/api/mobile/menu?canteen_id=X</code></td>
+                    <td>Jídelníček pro mobilní aplikaci – vrací pokrmy se stavem fotky</td>
+                </tr>
+                <tr>
+                    <td><code>POST</code></td>
+                    <td><code>/api/mobile/upload</code></td>
+                    <td>Nahrání fotografie pokrmu (<code>multipart/form-data</code>)</td>
+                </tr>
+                <tr>
+                    <td><code>POST</code></td>
+                    <td><code>/api/mobile/verify_pin</code></td>
+                    <td>Ověření přístupového PINu mobilní aplikace (<code>JSON</code>)</td>
+                </tr>
+            </table>
+
+            <p>Všechny API endpointy vracejí data ve formátu JSON a obsahují patřičná CORS nastavení, aby na ně mohly bezpečně přistupovat infopanely i mobilní aplikace z různých síťových segmentů. Hlavičky odpovědí nesou bezpečnostní direktivy (např. <code>X-Content-Type-Options</code>, <code>X-Frame-Options</code>).</p>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Parsování kódů alergenů z textu</h4>
+
+            <p>Oficiální univerzitní API neposkytuje alergeny ve sjednocené formě. Proto jsme v <code>utils.py</code> napsali vlastní parser <code>parse_allergens</code> využívající regulární výrazy. Ten funguje ve dvou režimech:</p>
+
+            <ul>
+                <li><strong>Přímé kódy:</strong> Pokud text obsahuje rovnou čísla alergenů (detekované výrazem <code>\b(1[0-4]|[1-9][a-h]?)\b</code>), parser je vytáhne regulárním výrazem.</li>
+                <li><strong>Klíčová slova:</strong> Pokud čísla chybí, parser prohledává text na přítomnost klíčových slov pro všech 14 kategorií alergenů (např. „pšenice“ → 1a, „vejce“ → 3).</li>
+            </ul>
+
+            <p>Ošetřili jsme i okrajové případy – například vyhledávání para ořechů (alergen 8f) chytře ignoruje slovo „parametr“, aby nedocházelo k falešným nálezům.</p>
+
+            <div class="info-box"><span class="material-symbols-outlined icon">terminal</span>
+                <div>
+                    <strong>Automatizované testování:</strong> Správnost chování parseru alergenů a algoritmu na generování unikátních ASCII slugů trvale ověřuje sada 13 jednotkových testů v souboru <code>test_utils.py</code>. Testy lze spustit příkazem <code>python -m pytest test_utils.py -v</code>.
+                </div>
+            </div>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Bezpečnostní opatření</h4>
+
+            <ul>
+                <li><strong>SQL Injection:</strong> Veškeré dotazy jsou parametrizované (zástupné znaky <code>%s</code> v <code>psycopg2</code>). Nikde nepoužíváme přímé spojování řetězců s uživatelskými vstupy.</li>
+                <li><strong>Validace souborů:</strong> Nahrávané fotky kontrolujeme na povolené přípony (<code>jpg</code>, <code>jpeg</code>, <code>png</code>, <code>webp</code>) i skutečný typ (MIME type). Název souboru čistíme funkcí <code>secure_filename()</code>.</li>
+                <li><strong>HTTP hlavičky:</strong> Každá odpověď obsahuje bezpečnostní hlavičky (<code>X-Content-Type-Options: nosniff</code>, <code>X-Frame-Options: SAMEORIGIN</code>).</li>
+                <li><strong>Izolace služeb:</strong> Databáze není přístupná zvenčí – komunikace probíhá výhradně uvnitř virtuální sítě Dockeru.</li>
+            </ul>
+
+            <div class="nav-footer">
+                <a href="../spravce/robot.html">&#8592; Synchronizace &amp; Importér (robot.py)</a>
+                <a href="mobil.html">Mobilní vnitřnosti (Isolates &amp; Cache) &#8594;</a>
+                <div class="nav-comment">Obrázky v nápovědě jsou ilustrační.</div>
+            </div>
+        </div></div>
+    </div>
+    <div id="footer"><footer>
+        <p><strong>Uživatelské Helpcentrum Menza UTB</strong> &nbsp;|&nbsp; 2026
+            &nbsp;&nbsp;
+            <a href="../uzivatel/index.html">Uživatel</a> |
+            <a href="../spravce/index.html">Správce</a> |
+            <a href="../vyvoj/index.html">Vývojář</a></p>
+    </footer></div>
+</div>
+<script src="../router.js"></script>
+</body>
+</html>

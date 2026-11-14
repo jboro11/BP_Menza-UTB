@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Mobilní aplikace pro obsluhu – Uživatelská dokumentace</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="../style.css?v=4">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+</head>
+<body>
+<div id="wrap">
+    <div id="header"><header>
+        <div class="logo-area">
+            <div class="logo-icon"><span class="material-symbols-outlined">restaurant</span></div>
+            <div class="logo-text">
+                <h1>Menza UTB – Uživatelská nápověda</h1>
+                <p>Dokumentace a technické manuály k systému vizuální prezentace jídel</p>
+            </div>
+        </div>
+    </header></div>
+    <div id="xmain">
+        <div id="menu">
+            <button id="menu-toggle" onclick="document.getElementById('menu').classList.toggle('open')"><span class="material-symbols-outlined">menu</span> Navigace</button>
+            <ul>
+                <li id="current"><a href="../uzivatel/index.html" class="active"><span class="material-symbols-outlined icon">menu_book</span>1. Uživatelský manuál</a>
+                    <ul class="sideSub">
+                        <li><a href="../uzivatel/index.html" class="active">Focení jídel (Mobilní aplikace)</a></li>
+                        <li><a href="../uzivatel/kiosk.html">Zobrazení na TV (Kiosk)</a></li>
+                    </ul>
+                </li>
+                <li><a href="../spravce/index.html"><span class="material-symbols-outlined icon">admin_panel_settings</span>2. Správcovská příručka</a></li>
+                <li><a href="../vyvoj/index.html"><span class="material-symbols-outlined icon">code</span>3. Vývojářská dokumentace</a></li>
+            </ul>
+        </div>
+        <div id="content-wrap"><div id="main">
+
+            <h3 class="title">Focení jídel (Mobilní aplikace pro obsluhu)</h3>
+
+            <p>Mobilní aplikace slouží k rychlému a snadnému pořizování snímků jídel přímo u výdejního pultu. Celý proces je navržen tak, aby nezdržoval personál při výdeji a zabral jen několik sekund, aniž by jakkoliv narušil plynulý provoz kuchyně.</p>
+
+            <p>Díky využití multiplatformního frameworku Flutter (jazyk Dart) aplikace funguje spolehlivě na zařízeních se systémem Android i iOS z jedné kódové základny. Pro snadné nasazení stačí nainstalovat distribuční balíček (APK) přímo do telefonu obsluhy bez nutnosti publikování v oficiálních obchodech Google Play nebo App Store.</p>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Autorizace přístupu (PIN Gate)</h4>
+
+            <p>Při každém spuštění vyžaduje aplikace zadání čtyřmístného přístupového kódu. Ten se ověřuje vůči serverovému API (endpoint <code>/api/mobile/verify_pin</code>). PIN se nastavuje v konfiguračním souboru <code>.env</code> pomocí proměnné <code>MOBILE_APP_PIN</code>.</p>
+
+            <p><strong>Ochrana proti hádání kódu (brute-force):</strong> Pokud pětkrát za sebou zadáte nesprávný kód, aplikace se z bezpečnostních důvodů na 30 sekund zablokuje. Během této doby nelze odesílat další pokusy o přihlášení a na obrazovce se zobrazuje odpočet zbývajícího času. Po uplynutí tohoto intervalu se počítadlo pokusů vynuluje a pole pro zadání PINu se opět zpřístupní.</p>
+
+            <!-- SCREENSHOT: PIN GATE -->
+            <div class="screenshot" style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin: 24px 0;">
+                <div style="flex: 1; min-width: 200px; max-width: 320px; text-align: center;">
+                    <img src="../img/01.png" alt="PIN obrazovka – běžný stav" style="width: 100%; border: 1.5px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+                    <div style="font-size: 13px; color: #64748b; margin-top: 8px; font-weight: 500;">Běžný stav zadávání kódu</div>
+                </div>
+                <div style="flex: 1; min-width: 200px; max-width: 320px; text-align: center;">
+                    <img src="../img/02.png" alt="PIN uzamčený – stav po uzamčení s odpočtem" style="width: 100%; border: 1.5px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+                    <div style="font-size: 13px; color: #64748b; margin-top: 8px; font-weight: 500;">Stav po uzamčení s odpočtem</div>
+                </div>
+            </div>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Hlavní rozhraní (Dashboard) a režimy plnění databáze</h4>
+
+            <p>Po úspěšném přihlášení se otevře hlavní obrazovka (Dashboard) se dvěma režimy pro pořizování fotografií. Volba režimu závisí na tom, jaký způsob práce obsluze více vyhovuje.</p>
+
+            <ol class="steps">
+                <li><strong>Denní jídelníček (výběrový režim):</strong> Obsluha si zvolí konkrétní menzu (např. U4, U5, U13) a uvidí její kompletní nabídku pro daný den. Každé jídlo má barevný štítek s aktuálním stavem:
+                    <ul style="margin-top: 8px; padding-left: 20px;">
+                        <li><strong style="color: #dc2626;">VYFOTIT</strong> – jídlo ještě nemá v databázi přiřazenou fotografii</li>
+                        <li><strong style="color: #16a34a;">HOTOVO</strong> – fotografie byla úspěšně odeslána na server</li>
+                        <li><strong style="color: #ea580c;">K NAHRÁNÍ</strong> – fotografie čeká v lokální frontě na odeslání</li>
+                    </ul>
+                </li>
+                <li><strong>Rychlé plnění (postupný režim):</strong> Režim navržený pro maximální rychlost práce. Aplikace spojí jídelníčky ze všech menz a ukáže pouze jídla, která ještě nemají fotku. Obsluha nemusí přepínat mezi jídelnami, ale fotí jedno jídlo za druhým ze společného seznamu. Po odeslání fotky se automaticky přejde na další jídlo v pořadí.</li>
+            </ol>
+
+            <!-- SCREENSHOT: DASHBOARD -->
+            <div class="screenshot" style="margin: 24px auto; max-width: 320px; text-align: center;">
+                <img src="../img/03.png" alt="Hlavní obrazovka Dashboardu" style="width: 100%; border: 1.5px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+                <div style="font-size: 13px; color: #64748b; margin-top: 8px; font-weight: 500;">Hlavní obrazovka Dashboardu se dvěma režimy</div>
+            </div>
+
+            <!-- SCREENSHOT: DENNI JIDELNICEK -->
+            <div class="screenshot" style="margin: 24px auto; max-width: 320px; text-align: center;">
+                <img src="../img/04.png" alt="Seznam jídel se štítky stavu" style="width: 100%; border: 1.5px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+                <div style="font-size: 13px; color: #64748b; margin-top: 8px; font-weight: 500;">Seznam jídel s barevnými štítky stavu (VYFOTIT / HOTOVO)</div>
+            </div>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Pořízení a odeslání fotografie</h4>
+
+            <p>Po rozkliknutí konkrétního jídla se zobrazí jeho detail, seznam obsažených alergenů a pole pro nahrání snímku. Fotku lze pořídit dvěma způsoby:</p>
+
+            <ul>
+                <li><strong>Vyfotit</strong> – spustí vestavěný fotoaparát pro okamžité pořízení snímku přímo u výdejního pultu.</li>
+                <li><strong>Galerie</strong> – umožní vybrat dříve pořízenou fotografii z galerie telefonu.</li>
+            </ul>
+
+            <p>Po pořízení snímku se na pozadí spustí automatická úprava obrázku. Ta běží v samostatném výpočetním vlákně (Dart Isolate), takže aplikace během zpracování vůbec nezamrzá. Úprava obsahuje tyto kroky v přesném pořadí:</p>
+
+            <ol class="steps">
+                <li><strong>Středový ořez</strong> – oříznutí snímku na čtvercový poměr stran 1:1 se zaměřením na střed.</li>
+                <li><strong>Zmenšení rozlišení</strong> – přeškálování snímku na rozlišení <strong>1200 × 1200 pixelů</strong> pro úsporu mobilních dat při přenosu a úložného prostoru na serveru.</li>
+                <li><strong>Jasová normalizace (úprava expozice)</strong> – automatické doladění jasu, aby fotky nebyly příliš tmavé nebo přesvícené kvůli světelným podmínkám na výdejnách.</li>
+                <li><strong>Sytost barev (saturace)</strong> – mírné zvýraznění barev, aby jídlo na obrazovkách vypadalo lákavěji.</li>
+                <li><strong>Doostření</strong> – použití filtru (Unsharp Mask) pro zvýraznění textur a detailů jídla.</li>
+            </ol>
+
+            <!-- SCREENSHOT: FOCENI -->
+            <div class="screenshot" style="margin: 24px auto; max-width: 320px; text-align: center;">
+                <img src="../img/05.png" alt="Detail jídla s možností pořízení fotky" style="width: 100%; border: 1.5px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+                <div style="font-size: 13px; color: #64748b; margin-top: 8px; font-weight: 500;">Obrazovka detailu jídla s tlačítky Vyfotit a Galerie</div>
+            </div>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Náhled a porovnání verzí (Live Peek)</h4>
+
+            <p>Na obrazovce s náhledem vidíte upravenou fotku. Podržením prstu na obrázku můžete dočasně zobrazit původní neupravený snímek (Live Peek). Jakmile prst pustíte, ukáže se opět verze s filtry. To umožňuje snadné vizuální porovnání.</p>
+
+            <p>Technicky toto přepínání bez prodlevy či probliknutí zajišťuje widget <code>IndexedStack</code>, který drží oba obrázky načtené v paměti současně. Stiskem tlačítka <strong>Odeslat</strong> se upravená fotka nahraje na server přes HTTP POST jako <code>multipart/form-data</code>.</p>
+
+            <!-- SCREENSHOT: NAHLED POROVNANI -->
+            <div class="screenshot" style="margin: 24px auto; max-width: 320px; text-align: center;">
+                <img src="../img/06.png" alt="Náhledová obrazovka" style="width: 100%; border: 1.5px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+                <div style="font-size: 13px; color: #64748b; margin-top: 8px; font-weight: 500;">Náhledová obrazovka s vylepšeným snímkem a tlačítkem Odeslat</div>
+            </div>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Offline fronta (Upload Queue)</h4>
+
+            <p>Na výdejnách může občas vypadnout Wi-Fi připojení. Aplikace proto obsahuje offline frontu, která zaručuje, že žádná vyfocená fotka nezmizí, i když je server momentálně nedostupný.</p>
+
+            <p>Pokud se odeslání fotky nepodaří (např. kvůli výpadku sítě), snímek se automaticky uloží do lokální fronty v telefonu. Informace o jídle se uloží do souboru JSON a samotný obrázek se přesune do trvalého adresáře aplikace, takže ho operační systém nesmaže jako dočasný soubor.</p>
+
+            <p>Po obnovení připojení nebo při novém spuštění se fronta automaticky odešle na server na pozadí. Po úspěšném nahrání aplikace soubory z paměti telefonu smaže. V seznamu jídel je takové jídlo označeno oranžovým štítkem <strong>K NAHRÁNÍ</strong>.</p>
+
+            <div class="info-box"><span class="material-symbols-outlined icon">wifi_off</span>
+                <div>
+                    <strong>Praktický scénář:</strong> Obsluha pořídí 5 fotografií během výpadku Wi-Fi. Aplikace je uloží do offline fronty a jakmile se připojení obnoví, automaticky je odešle na server v pozadí, bez nutnosti jakéhokoliv zásahu.
+                </div>
+            </div>
+
+            <div class="nav-footer">
+                <span></span>
+                <a href="kiosk.html">Zobrazení na TV (Kiosk) &#8594;</a>
+                <div class="nav-comment">Obrázky v nápovědě jsou ilustrační.</div>
+            </div>
+        </div></div>
+    </div>
+    <div id="footer"><footer>
+        <p><strong>Uživatelské Helpcentrum Menza UTB</strong> &nbsp;|&nbsp; 2026
+            &nbsp;&nbsp;
+            <a href="../uzivatel/index.html">Uživatel</a> |
+            <a href="../spravce/index.html">Správce</a> |
+            <a href="../vyvoj/index.html">Vývojář</a></p>
+    </footer></div>
+</div>
+<script src="../router.js"></script>
+</body>
+</html>

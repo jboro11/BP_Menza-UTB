@@ -1,0 +1,51 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Konfigurace prostředí a klíče
+.env
+.env.*
+!.env.example
+*.env.local
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+
+# Místní zálohy a exporty
+zaloha_db.sql
+*.dump
+*.bak
+*.sqlite*
+canteen=*/
+master.csv
+
+# nahrane fotky
+webova_aplikace/static/uploads/
+webova_aplikace/static/photos/
+
+# vyvojova virtualni prostredi
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# logy
+robot.log
+*.log
+
+# Výstupy sestavení
+.gradle/
+build/
+.pytest_cache/

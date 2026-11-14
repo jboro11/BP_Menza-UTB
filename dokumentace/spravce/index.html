@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Docker &amp; Konfigurace serveru – Příručka správce Menza UTB</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="../style.css?v=4">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+</head>
+<body>
+<div id="wrap">
+    <div id="header"><header>
+        <div class="logo-area">
+            <div class="logo-icon"><span class="material-symbols-outlined">restaurant</span></div>
+            <div class="logo-text">
+                <h1>Menza UTB – Uživatelská nápověda</h1>
+                <p>Dokumentace a technické manuály k systému vizuální prezentace jídel</p>
+            </div>
+        </div>
+    </header></div>
+    <div id="xmain">
+        <div id="menu">
+            <button id="menu-toggle" onclick="document.getElementById('menu').classList.toggle('open')"><span class="material-symbols-outlined">menu</span> Navigace</button>
+            <ul>
+                <li><a href="../uzivatel/index.html"><span class="material-symbols-outlined icon">menu_book</span>1. Uživatelský manuál</a></li>
+                <li id="current"><a href="../spravce/index.html" class="active"><span class="material-symbols-outlined icon">admin_panel_settings</span>2. Správcovská příručka</a>
+                    <ul class="sideSub">
+                        <li><a href="../spravce/index.html" class="active">Docker &amp; Konfigurace serveru</a></li>
+                        <li><a href="../spravce/robot.html">Synchronizace &amp; Importér (robot.py)</a></li>
+                    </ul>
+                </li>
+                <li><a href="../vyvoj/index.html"><span class="material-symbols-outlined icon">code</span>3. Vývojářská dokumentace</a></li>
+            </ul>
+        </div>
+        <div id="content-wrap"><div id="main">
+
+            <h3 class="title">Docker &amp; Konfigurace serveru</h3>
+
+            <p>Celou backendovou část systému spouštíme v izolovaných kontejnerech platformy Docker. Díky tomu je aplikace zcela nezávislá na hostitelském operačním systému serveru, odpadá nutnost ruční instalace knihoven a závislostí a systém se chová naprosto stejně na lokálním vývojovém počítači i na produkčním serveru. Celé prostředí tak zprovozníte na čistém serveru jediným příkazem.</p>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Požadavky na hardware a software</h4>
+
+            <p>Před nasazením systému si prosím ověřte, že váš server a koncová zařízení splňují tyto minimální požadavky:</p>
+
+            <table class="data-table">
+                <tr>
+                    <th>Komponenta</th>
+                    <th>Minimální požadavek</th>
+                    <th>Doporučení</th>
+                </tr>
+                <tr>
+                    <td>Server</td>
+                    <td>Libovolný Linux server s Docker Engine</td>
+                    <td>Ubuntu 22.04+ LTS, 2 GB RAM, 20 GB disk</td>
+                </tr>
+                <tr>
+                    <td>Docker</td>
+                    <td>Docker Engine 20.10+</td>
+                    <td>Nejnovější stabilní verze</td>
+                </tr>
+                <tr>
+                    <td>Docker Compose</td>
+                    <td>Compose V2 (plugin <code>docker compose</code>)</td>
+                    <td>Verze 2.20+</td>
+                </tr>
+                <tr>
+                    <td>TV panel</td>
+                    <td>Libovolný televizor s HDMI vstupem</td>
+                    <td>Full HD (1920 × 1080) nebo 4K</td>
+                </tr>
+                <tr>
+                    <td>Kiosk zařízení</td>
+                    <td>Raspberry Pi / Android TV box / mini PC</td>
+                    <td>Chromium v režimu Kiosk</td>
+                </tr>
+                <tr>
+                    <td>Mobilní zařízení</td>
+                    <td>Android 8.0+ nebo iOS 14+</td>
+                    <td>Zařízení s fotoaparátem a Wi-Fi</td>
+                </tr>
+            </table>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Konfigurace parametrů prostředí (soubor <code>.env</code>)</h4>
+
+            <p>Před prvním spuštěním kontejnerů si v kořenové složce projektu vytvořte konfigurační soubor <code>.env</code>. Jako šablona vám poslouží připravený vzorový soubor <code>.env.example</code>. Do souboru .env doplňte vlastní heslo k databázi a čtyřmístný PIN:</p>
+
+            <pre><code># Konfigurace PostgreSQL databáze
+DB_HOST=db
+DB_PORT=5432
+DB_NAME=postgres
+DB_USER=postgres
+DB_PASS=silne_uzivatelske_heslo
+
+# Autorizační kód pro mobilní aplikaci
+MOBILE_APP_PIN=</code></pre>
+
+            <div class="warning-box"><span class="material-symbols-outlined icon">warning</span>
+                <div>
+                    <strong>Bezpečnostní upozornění:</strong> Soubor <code>.env</code> obsahuje heslo k databázi a přístupový PIN pro mobilní aplikaci. Tento soubor je zařazen v <code>.gitignore</code> a nesmí se dostat do veřejného repozitáře. Pokud měníte heslo k databázi po jejím prvním spuštění, je nutné smazat stávající svazek PostgreSQL příkazem <code>docker compose down -v</code> a nechat databázi sestavit znovu.
+                </div>
+            </div>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Topologie služeb v Docker Compose</h4>
+
+            <p>Běh a propojení celého prostředí řídí konfigurační soubor <code>docker-compose.yml</code>. Ten definuje dvě služby běžící ve společné izolované virtuální síti:</p>
+
+            <ul>
+                <li><strong><code>db</code> (PostgreSQL 16-alpine):</strong> Relační databáze systému. Trvalé uložení dat zajišťuje pojmenovaný svazek <code>pgdata</code>. Soubor <code>init_db.sql</code> se při prvním spuštění automaticky načte (přes inicializační adresář <code>/docker-entrypoint-initdb.d/init.sql</code>), což vytvoří potřebné tabulky a naplní je výchozími daty pro testování. Zdravotní stav databáze průběžně ověřuje healthcheck (<code>pg_isready</code>) každých 10 sekund.</li>
+                <li><strong><code>web</code> (Flask + Gunicorn):</strong> Webový aplikační server naslouchající na portu <code>5001</code>. Aplikaci pohání robustní WSGI server Gunicorn s vícevláknovými workery (<code>gthread</code>). Lokální složka <code>static/uploads</code> je namontována přímo na disk hostitelského serveru, takže pořízené fotografie zůstanou bezpečně uloženy i při restartu či zničení kontejneru.</li>
+            </ul>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Správa a CLI příkazy</h4>
+
+            <p>Pro spouštění, sledování a správu kontejnerů slouží tyto standardní příkazy spouštěné v kořenové složce projektu (kde se nachází soubor <code>docker-compose.yml</code>):</p>
+
+            <pre><code># Sestavení obrazů a spuštění celého systému na pozadí
+docker compose up -d --build
+
+# Zobrazení stavu a healthchecků spuštěných služeb
+docker compose ps
+
+# Sledování systémového logu Flask serveru v reálném čase
+docker compose logs -f web
+
+# Bezpečné zastavení kontejnerů bez ztráty dat v DB
+docker compose down
+
+# Restart webové služby (např. po změně konfigurace)
+docker compose restart web</code></pre>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Záloha a obnova databáze</h4>
+
+            <p>Data v PostgreSQL databázi se ukládají do Docker svazku <code>pgdata</code>. Tento svazek bezpečně přežívá běžná zastavení i restarty kontejnerů (<code>docker compose down</code>). Ke smazání dat by došlo pouze při explicitním smazání svazku parametrem <code>-v</code>.</p>
+
+            <table class="data-table">
+                <tr>
+                    <th>Příkaz</th>
+                    <th>Data v DB</th>
+                    <th>Fotky na disku</th>
+                </tr>
+                <tr>
+                    <td><code>docker compose down</code></td>
+                    <td>✅ zachována</td>
+                    <td>✅ zachovány</td>
+                </tr>
+                <tr>
+                    <td><code>docker compose restart</code></td>
+                    <td>✅ zachována</td>
+                    <td>✅ zachovány</td>
+                </tr>
+                <tr>
+                    <td><code>docker compose down -v</code></td>
+                    <td>❌ smazána</td>
+                    <td>✅ zachovány</td>
+                </tr>
+            </table>
+
+            <p>Před jakýmkoliv čištěním svazků doporučujeme vytvořit aktuální zálohu databáze:</p>
+
+            <pre><code># Export aktuální DB do souboru zálohy
+docker compose exec db pg_dump -U postgres postgres > webova_aplikace/zaloha_db.sql
+
+# Úplné vyčištění DB a nová inicializace z init_db.sql
+docker compose down -v && docker compose up -d --build</code></pre>
+
+            <div class="warning-box"><span class="material-symbols-outlined icon">warning</span>
+                <div>
+                    <strong>Upozornění:</strong> Použití parametru <code>-v</code> při zastavení systému nevratně smaže databázový svazek PostgreSQL. Po novém startu se databáze inicializuje ze souboru <code>init_db.sql</code> a veškeré změny či nově vyfocená jídla od poslední zálohy budou ztraceny.
+                </div>
+            </div>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Řešení častých problémů</h4>
+
+            <table class="data-table">
+                <tr>
+                    <th>Příznak</th>
+                    <th>Možná příčina</th>
+                    <th>Řešení</th>
+                </tr>
+                <tr>
+                    <td>Kontejner <code>web</code> se neustále restartuje</td>
+                    <td>Databáze ještě neprošla healthcheckem</td>
+                    <td>Vyčkat 30 sekund, ověřit <code>docker compose ps</code></td>
+                </tr>
+                <tr>
+                    <td>TV panel zobrazuje „Dnes není dostupná žádná nabídka"</td>
+                    <td>Všechny porce daného pokrmu jsou vyprodány, nebo API WebKreditu nevrací data (víkend, svátek)</td>
+                    <td>Ověřit log: <code>docker compose logs web</code></td>
+                </tr>
+                <tr>
+                    <td>Mobilní aplikace hlásí „Databáze nedostupná"</td>
+                    <td>Kontejner <code>db</code> neběží nebo chybné údaje v <code>.env</code></td>
+                    <td>Ověřit stav DB: <code>docker compose ps db</code></td>
+                </tr>
+                <tr>
+                    <td>Fotky se po restartu nezobrazují</td>
+                    <td>Složka <code>static/uploads</code> není namontovaná jako volume</td>
+                    <td>Ověřit konfiguraci volumes v <code>docker-compose.yml</code></td>
+                </tr>
+            </table>
+
+            <div class="nav-footer">
+                <a href="../uzivatel/kiosk.html">&#8592; Zobrazení na TV (Kiosk)</a>
+                <a href="robot.html">Synchronizace &amp; Importér (robot.py) &#8594;</a>
+                <div class="nav-comment">Obrázky v nápovědě jsou ilustrační.</div>
+            </div>
+        </div></div>
+    </div>
+    <div id="footer"><footer>
+        <p><strong>Uživatelské Helpcentrum Menza UTB</strong> &nbsp;|&nbsp; 2026
+            &nbsp;&nbsp;
+            <a href="../uzivatel/index.html">Uživatel</a> |
+            <a href="../spravce/index.html">Správce</a> |
+            <a href="../vyvoj/index.html">Vývojář</a></p>
+    </footer></div>
+</div>
+<script src="../router.js"></script>
+</body>
+</html>

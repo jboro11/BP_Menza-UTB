@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Mobilní vnitřnosti – Vývojářská dokumentace Menza UTB</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="../style.css?v=4">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+</head>
+<body>
+<div id="wrap">
+    <div id="header"><header>
+        <div class="logo-area">
+            <div class="logo-icon"><span class="material-symbols-outlined">restaurant</span></div>
+            <div class="logo-text">
+                <h1>Menza UTB – Uživatelská nápověda</h1>
+                <p>Dokumentace a technické manuály k systémům vizuální prezentace jídel</p>
+            </div>
+        </div>
+    </header></div>
+    <div id="xmain">
+        <div id="menu">
+            <button id="menu-toggle" onclick="document.getElementById('menu').classList.toggle('open')"><span class="material-symbols-outlined">menu</span> Navigace</button>
+            <ul>
+                <li><a href="../uzivatel/index.html"><span class="material-symbols-outlined icon">menu_book</span>1. Uživatelský manuál</a></li>
+                <li><a href="../spravce/index.html"><span class="material-symbols-outlined icon">admin_panel_settings</span>2. Správcovská příručka</a></li>
+                <li id="current"><a href="../vyvoj/index.html" class="active"><span class="material-symbols-outlined icon">code</span>3. Vývojářská dokumentace</a>
+                    <ul class="sideSub">
+                        <li><a href="../vyvoj/index.html">Architektura backendu (Flask &amp; DB)</a></li>
+                        <li><a href="../vyvoj/mobil.html" class="active">Mobilní vnitřnosti (Isolates &amp; Cache)</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+        <div id="content-wrap"><div id="main">
+
+            <h3 class="title">Mobilní vnitřnosti (Isolates &amp; Cache)</h3>
+
+            <p>Mobilní aplikaci jsme vyvinuli ve frameworku Flutter (jazyk Dart) verze 3.x. O správu stavu (State Management) se stará architektonický vzor <strong>Provider</strong> využívající třídu <code>ChangeNotifier</code>. Tento přístup důsledně odděluje vzhled (UI widgety) od samotné logiky aplikace (<code>MenuProvider</code>), což usnadňuje testování a budoucí údržbu kódu.</p>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Architektura a struktura zdrojového kódu</h4>
+
+            <pre><code>lib/
+├── main.dart               # Vstupní bod aplikace, inicializace Providerů
+├── config/
+│   └── api_config.dart     # URL adresy API serveru, timeouty
+├── models/
+│   └── meal.dart           # Datový model pokrmu (Meal)
+├── providers/
+│   └── menu_provider.dart  # ChangeNotifier se stavem jídelníčku
+├── screens/
+│   ├── pin_screen.dart     # Obrazovka autorizace (PIN Gate)
+│   ├── dashboard.dart      # Hlavní rozcestník
+│   ├── menu_screen.dart    # Seznam pokrmů dle menzy
+│   └── photo_screen.dart   # Pořízení, náhled a odeslání snímku
+├── services/
+│   ├── api_service.dart    # HTTP komunikace se serverem
+│   ├── image_editing_service.dart  # Grafická pipeline (Isolate)
+│   └── upload_queue_service.dart   # Offline fronta (Singleton)
+└── widgets/
+    └── ...                 # Znovupoužitelné UI komponenty</code></pre>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Asynchronní zpracování obrazu na pozadí (Dart Isolates)</h4>
+
+            <p>Protože běhové prostředí Dartu je jednovláknové (využívá Event Loop), jakékoliv náročné operace na hlavním vlákně by způsobily nepříjemné škubání rozhraní (UI jank). Dekódování surových dat z fotoaparátu, ořez, změna rozlišení na 1200x1200px a aplikace filtrů by na hlavním vlákně zablokovaly aplikaci na 500 až 1500 ms podle výkonu telefonu.</p>
+
+            <p>Tento problém jsme vyřešili přesunutím kompletní úpravy fotek do samostatného vlákna na pozadí (Dart Isolate). V modulu <code>image_editing_service.dart</code> k tomu využíváme metodu <code>compute</code>:</p>
+
+            <pre><code>// Delegování výpočetně náročné filtrace do samostatného Isolátu
+Future&lt;Map&lt;String, Uint8List&gt;&gt; getPreviewBytes({required String imagePath}) async {
+  return compute(_processImageInIsolate, imagePath);
+}</code></pre>
+
+            <p>Isoláty nesdílejí paměť s hlavním vláknem a komunikují výhradně posíláním zpráv přes porty. Do isolátu předáme cestu k obrázku, na pozadí proběhne zpracování (ořez, zmenšení, normalizace jasu, saturace a doostření) a výsledné pole bajtů (pro původní i upravenou verzi) se pošle zpět hlavnímu vláknu pro okamžité vykreslení.</p>
+
+            <div class="info-box"><span class="material-symbols-outlined icon">speed</span>
+                <div>
+                    <strong>Výkonový přínos:</strong> Díky přesunu výpočtů do isolátu zůstává hlavní vlákno zcela volné pro animace a reakce na dotyky uživatele. Zpracování snímku na pozadí trvá obvykle 300 až 800 ms, během nichž aplikace zobrazuje plynulé načítání bez jakéhokoliv zaseknutí.
+                </div>
+            </div>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Zamezení texture loading flash (IndexedStack)</h4>
+
+            <p>Při běžném podmíněném vykreslování obrázků (if-else) by při přepínání původní a upravené verze docházelo k opětovnému načítání a dekódování textury do GPU paměti. To by se na displeji projevovalo jako rušivé šedé či černé probliknutí trvající 50 až 150 ms.</p>
+
+            <p>Abychom toto problikávání zcela odstranili, použili jsme widget <code>IndexedStack</code>:</p>
+
+            <pre><code>IndexedStack(
+  index: _showOriginal ? 0 : 1,
+  children: [
+    Image.memory(widget.originalBytes, fit: BoxFit.contain),
+    Image.memory(widget.filteredBytes, fit: BoxFit.contain),
+  ],
+)</code></pre>
+
+            <p><code>IndexedStack</code> drží obě verze snímku přednačtené v GPU paměti současně, přestože vidět je vždy jen jedna z nich. Přechod mezi nimi (při podržení prstu přes <code>GestureDetector</code>) je díky tomu naprosto okamžitý, plynulý a bez jakýchkoliv grafických vad. Mírně vyšší paměťová náročnost je v tomto případě zcela zanedbatelná.</p>
+
+            <!-- SCREENSHOT: MOBIL GESTURE PREVIEW -->
+            <div class="screenshot" style="margin: 24px auto; max-width: 320px; text-align: center;">
+                <img src="../img/06.png" alt="Náhled zpracované fotografie v mobilní aplikaci" style="width: 100%; border: 1.5px solid #e2e8f0; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);">
+                <div style="font-size: 13px; color: #64748b; margin-top: 8px; font-weight: 500;">Náhled zpracované fotky s tlačítkem Odeslat</div>
+            </div>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Struktura perzistentní offline fronty</h4>
+
+            <p>Pokud odeslání fotky selže kvůli síti (např. <code>SocketException</code> nebo <code>TimeoutException</code>), spustí se mechanismus offline fronty, který spravuje třída <code>UploadQueueService</code> (navržená jako Singleton). Informace o čekajících úlohách se uloží do souboru JSON na lokální disk telefonu:</p>
+
+            <pre><code>// Perzistentní fronta v souboru queue.json
+[
+  {
+    "id": "1716503923481",
+    "mealId": 348,
+    "mealName": "Kuřecí prsa na bylinkách",
+    "imagePath": "/data/.../upload_queue/queue_img_348.jpg",
+    "timestamp": "2026-05-24T02:18:43.000"
+  }
+]</code></pre>
+
+            <p>Samotný obrázek se zkopíruje z dočasné složky fotoaparátu do trvalého adresáře aplikace (<code>getApplicationDocumentsDirectory()</code>), takže v telefonu zůstane i po restartu zařízení nebo úplném zavření aplikace. Po úspěšném dodatečném odeslání na server se lokální soubor smaže, aby zbytečně nezabíral místo v telefonu.</p>
+
+            <!-- ================================================================ -->
+            <h4 class="title">Komunikace se serverem (HTTP klient)</h4>
+
+            <p>Veškerou komunikaci se serverem sdružuje modul <code>api_service.dart</code>. Zajišťuje tyto operace:</p>
+
+            <table class="data-table">
+                <tr>
+                    <th>Operace</th>
+                    <th>HTTP metoda</th>
+                    <th>Endpoint</th>
+                    <th>Formát dat</th>
+                </tr>
+                <tr>
+                    <td>Ověření PINu</td>
+                    <td><code>POST</code></td>
+                    <td><code>/api/mobile/verify_pin</code></td>
+                    <td>JSON (<code>{"pin": "VÁŠ_PIN"}</code>)</td>
+                </tr>
+                <tr>
+                    <td>Stažení jídelníčku</td>
+                    <td><code>GET</code></td>
+                    <td><code>/api/mobile/menu</code></td>
+                    <td>JSON (pole pokrmů)</td>
+                </tr>
+                <tr>
+                    <td>Nahrání fotografie</td>
+                    <td><code>POST</code></td>
+                    <td><code>/api/mobile/upload</code></td>
+                    <td><code>multipart/form-data</code></td>
+                </tr>
+            </table>
+
+            <p>Každý HTTP požadavek má nastavený časový limit (timeout 15 sekund), aby aplikace nečekala nekonečně dlouho při výpadku serveru. V případě jakékoliv chyby se uživateli zobrazí srozumitelná zpráva přes <code>SnackBar</code> widget.</p>
+
+            <div class="nav-footer">
+                <a href="index.html">&#8592; Architektura backendu (Flask &amp; DB)</a>
+                <span></span>
+                <div class="nav-comment">Obrázky v nápovědě jsou ilustrační.</div>
+            </div>
+        </div></div>
+    </div>
+    <div id="footer"><footer>
+        <p><strong>Uživatelské Helpcentrum Menza UTB</strong> &nbsp;|&nbsp; 2026
+            &nbsp;&nbsp;
+            <a href="../uzivatel/index.html">Uživatel</a> |
+            <a href="../spravce/index.html">Správce</a> |
+            <a href="../vyvoj/index.html">Vývojář</a></p>
+    </footer></div>
+</div>
+<script src="../router.js"></script>
+</body>
+</html>

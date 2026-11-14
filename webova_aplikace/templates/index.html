@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Menza UTB - TV Signage</title>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+/* --- DESIGN TOKENS --- */
+:root {
+    --bg: #f8fafc;
+    --panel: #ffffff;
+    --text: #0f172a;
+    --muted: #475569; 
+    --accent: #e48200;
+    --border: #e2e8f0;
+    --danger: #dc2626;
+    --price-text: #15803d;
+    --allergen-text: #dc2626;
+    --shadow: 0 0.4vh 1.2vh rgba(15, 23, 42, 0.04);
+    --font: "Plus Jakarta Sans", sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    padding: 1.5vh 1.5vw;
+    user-select: none;
+    
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+.app {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* topbar */
+.topbar {
+    height: 7.5vh;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.5vw;
+    background: var(--panel);
+    border: 0.2vh solid var(--border);
+    border-radius: 1.5vh;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    margin-bottom: 2vh;
+}
+
+.brand {
+    font-size: 3.2vh;
+    font-weight: 800;
+    letter-spacing: -0.05vw;
+    display: flex;
+    align-items: center;
+    gap: 0.6vw;
+}
+.brand-main   { color: var(--text); }
+.brand-accent { color: var(--accent); }
+
+.canteen-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.4vw;
+    background: #f1f5f9;
+    padding: 0.5vh 0.4vw;
+    border-radius: 999px;
+    border: 0.15vh solid var(--border);
+}
+
+.canteen-btn {
+    border: none;
+    padding: 0.6vh 1.4vw;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 1.8vh;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+}
+
+.canteen-btn.active {
+    background: var(--accent);
+    color: #ffffff;
+    box-shadow: 0 0.2vh 0.8vh rgba(228, 130, 0, 0.3);
+}
+
+.clock-wrap {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.clock {
+    font-size: 3.2vh;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+.date {
+    font-size: 1.35vh;
+    font-weight: 700;
+    color: var(--muted);
+    margin-top: 0.3vh;
+    text-transform: uppercase;
+    letter-spacing: 0.05vw;
+}
+
+/* grid layout */
+.grid {
+    flex-grow: 1;
+    display: grid;
+    grid-template-rows: repeat(2, 1fr);
+    gap: 2vh 1.2vw;
+    overflow: hidden;
+}
+
+.grid.rows-1  { grid-template-rows: 1fr; }
+.grid.cols-2  { grid-template-columns: repeat(2, 1fr); }
+.grid.cols-3  { grid-template-columns: repeat(3, 1fr); }
+.grid.cols-4  { grid-template-columns: repeat(4, 1fr); }
+
+/* karta pokrmu */
+.card {
+    background: var(--panel);
+    border: 0.2vh solid var(--border);
+    border-radius: 2vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    box-shadow: var(--shadow);
+    justify-content: space-between;
+}
+
+/* promo karta (reklama) */
+.card.promo-card { border: none; background: #f8fafc; }
+.card.promo-card .image-wrap {
+    height: 100%;
+    border: none;
+    padding: 0.6vh 0.8vw;
+    background: var(--panel);
+}
+.card.promo-card .image { object-fit: contain; object-position: center; }
+
+.grid.cols-2 .card.promo-card .image-wrap { padding: 1.2vh 1.2vw; }
+.grid.cols-3 .card.promo-card .image-wrap { padding: 0.9vh 1vw; }
+.grid.cols-4 .card.promo-card .image-wrap { padding: 0.6vh 0.8vw; }
+
+/* obrázek */
+.image-wrap {
+    position: relative;
+    flex-grow: 1;
+    background: #f1f5f9;
+    overflow: hidden;
+    border-bottom: 0.2vh solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5vh 0.5vw;
+}
+
+.image {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+    display: block;
+}
+
+.image.fallback { object-fit: contain; padding: 0; background-color: #f1f5f9; }
+
+/* odznak počtu porcí */
+.portions {
+    position: absolute;
+    top: 1vh;
+    right: 1vh;
+    padding: 0.5vh 0.8vw;
+    border-radius: 1vh;
+    background: var(--danger);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2vh;
+    font-weight: 800;
+    border: 0.2vh solid #ffffff;
+    box-shadow: 0 0.4vh 1.2vh rgba(220, 38, 38, 0.35);
+    line-height: 1;
+    z-index: 2;
+    transition: opacity 0.3s ease;
+    gap: 0.3vw;
+}
+
+/* tělo karty */
+.body {
+    display: flex;
+    flex-direction: column;
+    padding: 0.6vh 1.2vw 0.8vh;
+    justify-content: space-between;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* textové okno s názvem pokrmu */
+.title-window {
+    position: relative;
+    height: 6vh;
+    padding: 0 0.2vw;
+    overflow: hidden;
+    display: block;
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 2%, #000 92%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 2%, #000 92%, transparent 100%);
+    mask-size: 100% 100%;
+    mask-repeat: no-repeat;
+}
+
+.title-scroll-track {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.title {
+    width: 100%;
+}
+
+.title-cz {
+    font-size: 2.2vh;
+    line-height: 1.25;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.title-cz + .title-en {
+    margin-top: 0.4vh;
+}
+
+.title-en {
+    font-size: 2.2vh;
+    line-height: 1.25;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+/* patička karty */
+.footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    border-top: 0.15vh solid var(--border);
+    padding-top: 0.8vh;
+    margin-top: 0.4vh;
+    flex-shrink: 0;
+    gap: 1vw;
+}
+
+.meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2vh;
+    min-width: 0;
+    flex: 1 1 0;
+}
+
+.meta-right {
+    align-items: flex-end;
+    text-align: right;
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+.meta-label {
+    font-size: 0.65vw; 
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.allergens {
+    color: var(--allergen-text);
+    font-size: 1.1vw; 
+    font-weight: 700;
+    line-height: 1.15;
+    white-space: nowrap; 
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 0.5vw;
+    letter-spacing: -0.02vw; 
+}
+
+.price {
+    color: var(--price-text);
+    font-size: 1.15vw; 
+    font-weight: 700;
+    line-height: 1;
+    text-align: right;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes infiniteScrollWithEn {
+    0%, 33.33% { transform: translateY(0); }                                
+    50%, 83.33% { transform: translateY(var(--en-offset)); }                
+    100% { transform: translateY(var(--scroll-limit)); }            
+}
+
+@keyframes infiniteScrollOnlyCz {
+    0%, 65% { transform: translateY(0); }
+    85%, 100% { transform: translateY(var(--scroll-limit)); }
+}
+
+.admin-selector {
+    position: fixed;
+    top: 1.5vh;
+    left: 1.5vw;
+    opacity: 0.05;
+    transition: opacity 0.3s ease;
+    z-index: 1000;
+    display: inline-block;
+}
+
+.admin-selector:hover {
+    opacity: 1 !important;
+}
+
+.admin-selector-trigger {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(0.5vh);
+    -webkit-backdrop-filter: blur(0.5vh);
+    border: 0.2vh solid var(--border);
+    border-radius: 50%;
+    width: 6.5vh;
+    height: 6.5vh;
+    font-size: 3.5vh;
+    cursor: pointer;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    transform: translateZ(0);
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.admin-selector-trigger:hover {
+    transform: rotate(60deg) translateZ(0);
+    color: var(--accent);
+    background: #ffffff;
+    border-color: var(--accent);
+}
+
+.admin-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 1vh;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(1.5vh);
+    -webkit-backdrop-filter: blur(1.5vh);
+    border: 0.2vh solid var(--border);
+    border-radius: 1.5vh;
+    box-shadow: 0 1vh 3vh rgba(15, 23, 42, 0.12);
+    display: flex;
+    flex-direction: column;
+    padding: 0.8vh;
+    gap: 0.4vh;
+    min-width: 12vw;
+    opacity: 0;
+    transform: translateY(-1vh);
+    pointer-events: none;
+    transition: opacity 0.3s ease 0.5s, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0.5s, pointer-events 0s ease 0.8s;
+}
+
+.admin-dropdown::before {
+    content: "";
+    position: absolute;
+    top: -2.5vh;
+    left: 0;
+    width: 100%;
+    height: 2.5vh;
+    background: transparent;
+    pointer-events: auto;
+}
+
+.admin-selector:hover .admin-dropdown {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+    transition: opacity 0.3s ease 0s, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1) 0s, pointer-events 0s ease 0s;
+}
+
+.admin-dropdown .canteen-btn {
+    border: none;
+    padding: 1vh 1.4vw;
+    border-radius: 1vh;
+    background: transparent;
+    color: var(--text);
+    font-size: 1.6vh;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    text-transform: uppercase;
+}
+
+.admin-dropdown .canteen-btn:hover {
+    background: #f1f5f9;
+    color: var(--accent);
+}
+
+.admin-dropdown .canteen-btn.active {
+    background: var(--accent);
+    color: #ffffff;
+    box-shadow: 0 0.2vh 0.8vh rgba(228, 130, 0, 0.3);
+}
+</style>
+</head>
+
+<body>
+
+<div class="admin-selector">
+    <button class="admin-selector-trigger" aria-label="Nastavení menzy">⚙️</button>
+    <div class="admin-dropdown" id="canteenStrip">
+        <button class="canteen-btn" data-id="2">U4</button>
+        <button class="canteen-btn" data-id="3">U5</button>
+        <button class="canteen-btn" data-id="4">BUFET U2</button>
+        <button class="canteen-btn" data-id="6">U13</button>
+        <button class="canteen-btn" data-id="15">GARNI</button>
+    </div>
+</div>
+
+<div class="app">
+    <!--
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-main">Menza</span>
+            <span class="brand-accent">UTB</span>
+            
+            <div class="admin-selector">
+                <button class="admin-selector-trigger" aria-label="Nastavení menzy">⚙️</button>
+                <div class="admin-dropdown" id="canteenStrip">
+                    <button class="canteen-btn" data-id="2">U4</button>
+                    <button class="canteen-btn" data-id="3">U5</button>
+                    <button class="canteen-btn" data-id="4">BUFET U2</button>
+                    <button class="canteen-btn" data-id="6">U13</button>
+                    <button class="canteen-btn" data-id="15">GARNI</button>
+                </div>
+            </div>
+        </div>
+        <div class="clock-wrap">
+            <div class="clock" id="clock">--:--:--</div>
+            <div class="date"  id="date">--.--.----</div>
+        </div>
+    </header>
+    -->
+    <main class="grid" id="grid"></main>
+</div>
+
+<script>
+"use strict";
+
+const CANTEEN_MAP = {
+    "u4": 2,
+    "u5": 3,
+    "u2": 4, "bufet": 4, "bufetu2": 4,
+    "u13": 6,
+    "garni": 15
+};
+
+function getInitialCanteenId() {
+    const params = new URLSearchParams(window.location.search);
+    const paramId = params.get("canteen_id");
+    if (paramId) {
+        const parsed = parseInt(paramId, 10);
+        if (!isNaN(parsed)) return parsed;
+    }
+    
+    const paramSlug = params.get("canteen");
+    if (paramSlug) {
+        const slugLower = paramSlug.toLowerCase().trim();
+        if (CANTEEN_MAP[slugLower]) return CANTEEN_MAP[slugLower];
+    }
+
+    const saved = localStorage.getItem("selected_canteen_id");
+    if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed)) return parsed;
+    }
+
+    return 2;
+}
+
+let currentCanteenId  = getInitialCanteenId();
+let lastKnownMeals    = null;
+let lastKnownCanteenId = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".canteen-btn").forEach(btn => {
+        if (parseInt(btn.dataset.id, 10) === currentCanteenId) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
+    });
+});
+
+const grid = document.getElementById("grid");
+
+function startClock() {
+    const clockEl = document.getElementById("clock");
+    const dateEl  = document.getElementById("date");
+    if (!clockEl || !dateEl) return;
+    function tick() {
+        const now = new Date();
+        clockEl.textContent = now.toLocaleTimeString("cs-CZ");
+        dateEl.textContent  = now.toLocaleDateString("cs-CZ", {
+            weekday: "short", day: "numeric", month: "numeric", year: "numeric"
+        });
+    }
+    tick();
+    setInterval(tick, 1000);
+}
+startClock();
+
+function esc(str) {
+    return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+async function loadMenuData(canteenId) {
+    try {
+        const response = await fetch(`/api/load-menu?canteen_id=${canteenId}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const result = await response.json();
+
+        if (result.status === "error") {
+            console.log("Server vrátil chybu:", result.message);
+            return;
+        }
+
+        let meals = result.data.filter(item =>
+            item.category && (item.category.toLowerCase().includes("oběd") || item.category.toLowerCase().includes("minutka"))
+        );
+        if (meals.length === 0) meals = result.data.slice(0, 8);
+
+        lastKnownMeals     = meals;
+        lastKnownCanteenId = canteenId;
+
+        renderMeals(meals, canteenId);
+
+    } catch (err) {
+        if (lastKnownMeals && lastKnownCanteenId === canteenId) {
+            console.log("Výpadek sítě, ponechávám poslední známá data v UI.");
+        } else {
+            console.log("Nepodařilo se načíst data ze serveru.");
+        }
+    }
+}
+
+async function refreshPortions(canteenId) {
+    try {
+        const response = await fetch(`/api/portions?canteen_id=${canteenId}`);
+        if (!response.ok) return;
+        const result = await response.json();
+        if (result.status !== "ok") return;
+
+        const cards = grid.querySelectorAll("article.card:not(.promo-card)");
+        let needsLayoutUpdate = false;
+
+        result.portions.forEach(item => {
+            let card = null;
+            for (const c of cards) {
+                if (c.getAttribute("data-name") === item.name) {
+                    card = c;
+                    break;
+                }
+            }
+            if (!card) return;
+
+            const badge = card.querySelector(".portions");
+            if (!badge) return;
+
+            const count = Number(item.count_available);
+            if (isNaN(count)) return;
+
+            badge.innerHTML = `<span style="font-size: 1.4vh; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.03vw; margin-right: 0.2vw;">Porce:</span>${count}`;
+
+            if (count === 0 && canteenId !== 15) {
+                card.remove();
+                needsLayoutUpdate = true;
+            }
+        });
+
+        if (needsLayoutUpdate) {
+            const mainCards = grid.querySelectorAll("article.card:not(.promo-card)");
+            if (mainCards.length === 0) {
+                grid.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;
+                    font-size:2.5vh;font-weight:800;color:#94a3b8;grid-column:1/-1;">
+                    Dnes není dostupná žádná nabídka.</div>`;
+            } else {
+                const totalRemaining = grid.querySelectorAll("article.card").length;
+                applyGridLayout(totalRemaining);
+            }
+        }
+    } catch (err) {
+    }
+}
+
+function renderMeals(meals, canteenId) {
+    const visibleMeals = meals.filter(meal => {
+        if (canteenId === 15) return true;
+        const portions = Number(meal.count_available);
+        return isNaN(portions) || portions !== 0;
+    });
+
+    if (visibleMeals.length === 0) {
+        grid.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;
+            font-size:2.5vh;font-weight:800;color:#94a3b8;grid-column:1/-1;">
+            Dnes není dostupná žádná nabídka.</div>`;
+        return;
+    }
+
+    let toRender = visibleMeals.slice(0, 8);
+
+    if (toRender.length % 2 !== 0 && toRender.length < 8) {
+        toRender.push({ isPromo: true });
+    }
+
+    applyGridLayout(toRender.length);
+
+    const html = toRender.map(meal => buildCard(meal, canteenId));
+    grid.innerHTML = html.join("");
+
+    if (window.activeCanteenObserver) {
+        window.activeCanteenObserver.disconnect();
+    }
+    window.activeCanteenObserver = new ResizeObserver(() => {
+        initScrolling();
+    });
+    window.activeCanteenObserver.observe(grid);
+}
+
+function buildCard(meal, canteenId) {
+    if (meal.isPromo) {
+        return `<article class="card promo-card">
+            <div class="image-wrap">
+                <img class="image" src="/zavareniny.png" alt="Promo"
+                    onerror="this.onerror=null;this.src='/sirsi_no_photo.png';">
+            </div>
+        </article>`;
+    }
+
+    const rawTitle = (meal.name || "Neznámý pokrm").replace(/^hlavní\s*-\s*/i, "").trim();
+    const title    = esc(rawTitle);
+
+    let titleEn = "";
+    if (meal.name_en && typeof meal.name_en === "string") {
+        const rawTitleEn = meal.name_en.replace(/^hlavní\s*-\s*/i, "").trim();
+        if (rawTitleEn.toLowerCase() !== rawTitle.toLowerCase()) {
+            titleEn = esc(rawTitleEn);
+        }
+    }
+
+    const titleEnHtml = titleEn ? `<div class="title-en">${titleEn}</div>` : "";
+
+    let photo    = "/sirsi_no_photo.png";
+    let imgClass = "image fallback";
+    if (meal.image_url && meal.image_url.trim()) {
+        photo    = `/static/${esc(meal.image_url)}`;
+        imgClass = "image";
+    }
+
+    const allergens  = formatAllergens(meal.allergens);
+    const studentRaw = meal.price ?? meal.price_student;
+    const fullRaw    = meal.price_public ?? meal.price2 ?? meal.price_full;
+    const price      = buildPrice(studentRaw, fullRaw);
+
+    const portions      = Number(meal.count_available);
+    const portionsBadge = (canteenId !== 15 && !isNaN(portions))
+        ? `<div class="portions"><span style="font-size: 1.4vh; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.03vw; margin-right: 0.2vw;">Porce:</span>${portions}</div>` : "";
+
+    return `<article class="card" data-name="${esc(meal.name)}">
+        <div class="image-wrap">
+            <img class="${imgClass}" src="${photo}" alt="${title}"
+                onerror="this.onerror=null;this.src='/sirsi_no_photo.png';this.className='image fallback';">
+            ${portionsBadge}
+        </div>
+        <div class="body">
+            <div class="title-window">
+                <div class="title-scroll-track">
+                    <div class="title">
+                        <div class="title-cz">${title}</div>
+                        ${titleEnHtml}
+                    </div>
+                </div>
+            </div>
+            <div class="footer">
+                <div class="meta">
+                    <div class="meta-label">Alergeny</div>
+                    <div class="allergens">${allergens}</div>
+                </div>
+                <div class="meta meta-right">
+                    <div class="meta-label">Student / Plná cena</div>
+                    <div class="price">${price}</div>
+                </div>
+            </div>
+        </div>
+    </article>`;
+}
+
+function initScrolling() {
+    const MAX_HEIGHT  = '6vh';
+    const DURATION_EN = 18;
+    const DURATION_CZ = 20;
+    const DELAY       = 2.5;
+
+    document.querySelectorAll(".title-window").forEach(win => {
+        const track = win.querySelector(".title-scroll-track");
+        if (!track) return;
+        const original = track.querySelector(".title");
+        if (!original) return;
+
+        track.style.animation = "none";
+        track.querySelectorAll(".title-duplicate").forEach(d => d.remove());
+        win.style.height = MAX_HEIGHT;
+        win.style.maskImage = '';
+        win.style.webkitMaskImage = '';
+
+        original.style.paddingBottom = "0px";
+        const contentHeight = original.scrollHeight;
+        original.style.paddingBottom = "";
+
+        if (contentHeight <= win.clientHeight + 1) {
+            win.style.height = contentHeight + 'px';
+            win.style.maskImage = 'none';
+            win.style.webkitMaskImage = 'none';
+            return;
+        }
+
+        const clone = original.cloneNode(true);
+        clone.classList.add("title-duplicate");
+        track.appendChild(clone);
+
+        const blockH = original.getBoundingClientRect().height;
+        const enEl   = original.querySelector(".title-en");
+
+        track.style.setProperty("--scroll-limit", `-${blockH}px`);
+
+        if (enEl) {
+            const origRect = original.getBoundingClientRect();
+            const enRect   = enEl.getBoundingClientRect();
+            const enOffset = enRect.top - origRect.top;
+            track.style.setProperty("--en-offset", `-${enOffset}px`);
+            track.style.animation = `infiniteScrollWithEn ${DURATION_EN}s linear ${DELAY}s infinite`;
+        } else {
+            track.style.animation = `infiniteScrollOnlyCz ${DURATION_CZ}s linear ${DELAY}s infinite`;
+        }
+
+        track.style.animationFillMode = "both";
+    });
+}
+
+function applyGridLayout(count) {
+    grid.className = "grid";
+    if (count <= 2) {
+        grid.classList.add("cols-2", "rows-1");
+    } else if (count <= 4) {
+        grid.classList.add("cols-2");
+    } else if (count <= 6) {
+        grid.classList.add("cols-3");
+    } else {
+        grid.classList.add("cols-4");
+    }
+}
+
+function formatPrice(raw) {
+    if (raw == null || raw === "") return "?";
+    const num = typeof raw === "number" ? raw : Number(String(raw).trim().replace(",", "."));
+    if (isNaN(num)) return "?";
+    if (Math.floor(num) === num) {
+        return num.toString().replace(".", ",");
+    }
+    return num.toFixed(2).replace(".", ",");
+}
+
+function buildPrice(studentRaw, fullRaw) {
+    const s = (studentRaw != null) ? formatPrice(studentRaw) : null;
+    const f = (fullRaw    != null) ? formatPrice(fullRaw)    : null;
+    if (s && f) return `${s} / ${f} Kč`;
+    if (s) return `${s} Kč`;
+    if (f) return `${f} Kč`;
+    return "?";
+}
+
+function formatAllergens(raw) {
+    if (!raw) return "—";
+    const nums = new Set();
+    String(raw).split(",").forEach(part => {
+        const m = part.trim().match(/^(\d+)/);
+        if (m) nums.add(Number(m[1]));
+    });
+    return nums.size ? [...nums].sort((a, b) => a - b).join(",") : "—";
+}
+
+document.getElementById("canteenStrip").addEventListener("click", e => {
+    if (!e.target.classList.contains("canteen-btn")) return;
+    document.querySelectorAll(".canteen-btn").forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active");
+    currentCanteenId = parseInt(e.target.dataset.id, 10);
+    localStorage.setItem("selected_canteen_id", currentCanteenId);
+    loadMenuData(currentCanteenId);
+});
+
+loadMenuData(currentCanteenId);
+setInterval(() => loadMenuData(currentCanteenId),    5  * 60 * 1000);
+setInterval(() => refreshPortions(currentCanteenId), 30 * 1000);
+</script>
+
+</body>
+</html>
